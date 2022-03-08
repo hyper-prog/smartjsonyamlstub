@@ -28,6 +28,10 @@ type SmartJsonYamlConfig struct {
 	// If the YamlAlwaysUseQuotesForString value is true the Yaml generator
 	// put every string in quotes. The default is false.
 	YamlAlwaysUseQuotesForString bool
+	// If the OutputMapKeyOrder string array is not empty
+	// the Yaml and Json generator functions prefers this string order in map type nodes.
+	// This is a workaround to get rid of side effects of randomized go maps, which is used by parsers.
+	OutputMapKeyOrder []string
 }
 
 // SmartJsonYamlBase is the base structure of SmartJSON and SmartYAML
@@ -46,6 +50,7 @@ func (conf *SmartJsonYamlConfig) InitConfig() {
 	conf.NotFoundOrInvalidNotation = "none"
 	conf.YamlGeneratorIndenter = "  "
 	conf.YamlAlwaysUseQuotesForString = false
+	conf.OutputMapKeyOrder = []string{}
 }
 
 // Yaml generates a yaml output
@@ -72,7 +77,28 @@ func (sjyb SmartJsonYamlBase) jsonNodeToString(v interface{}, indent string, pre
 			out += "{"
 		}
 		c := 0
+
+		done := []string{}
+		for _, orderedKey := range sjyb.Config.OutputMapKeyOrder {
+			if _, ok := m[orderedKey]; ok {
+				sep := ""
+				if c > 0 {
+					if prettyOutput {
+						sep = ",\n  " + indent
+					} else {
+						sep = ","
+					}
+				}
+				out += sep + "\"" + n + "\":" + sjyb.jsonNodeToString(v, indent+"  ", prettyOutput)
+				done = append(done, orderedKey)
+				c++
+			}
+		}
+
 		for n, v := range m {
+			if contains(done, n) {
+				continue
+			}
 			sep := ""
 			if c > 0 {
 				if prettyOutput {
@@ -171,7 +197,22 @@ func (sjyb SmartJsonYamlBase) yamlNodeToString(v interface{}, pindent string, pa
 		}
 		c := 0
 
+		done := []string{}
+		for _, orderedKey := range sjyb.Config.OutputMapKeyOrder {
+			if _, ok := m[orderedKey]; ok {
+				if parent != "array" || c != 0 {
+					out += pindent + addindent
+				}
+				out += orderedKey + ":" + sjyb.yamlNodeToString(m[orderedKey], pindent+addindent, "map")
+				done = append(done, orderedKey)
+				c++
+			}
+		}
+
 		for n, v := range m {
+			if contains(done, n) {
+				continue
+			}
 			if parent != "array" || c != 0 {
 				out += pindent + addindent
 			}
@@ -566,4 +607,13 @@ func (sjyb SmartJsonYamlBase) GetCountDescendantsByPath(path string) int {
 		return len(m)
 	}
 	return 0
+}
+
+func contains(elems []string, v string) bool {
+	for _, s := range elems {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }

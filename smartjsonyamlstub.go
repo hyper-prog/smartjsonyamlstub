@@ -89,7 +89,7 @@ func (sjyb SmartJsonYamlBase) jsonNodeToString(v interface{}, indent string, pre
 						sep = ","
 					}
 				}
-				out += sep + "\"" + n + "\":" + sjyb.jsonNodeToString(v, indent+"  ", prettyOutput)
+				out += sep + "\"" + orderedKey + "\":" + sjyb.jsonNodeToString(m[orderedKey], indent+"  ", prettyOutput)
 				done = append(done, orderedKey)
 				c++
 			}
